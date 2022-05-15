@@ -2,8 +2,10 @@ defmodule Service do
   @moduledoc """
   Documentation for `Service`.
   """
-  @values ["1", "7", "0", "2", "3", "5", "4", "6", "9", "8"]
 
+  @values ["1", "7", "0", "2", "3", "5", "4", "6", "9", "8"]
+  @divider (255 / length(@values))
+  #@cores 8
 
   def start(path), do: start(path, 100)
   def start(path, newWidth) do
@@ -18,62 +20,72 @@ defmodule Service do
       ^image = image |> :wxImage.rescale(newWidth, newHeight)
     end
 
-    # get image data
-    dataNumber = image 
-      |> :wxImage.getData() 
-      |> :binary.bin_to_list()
-      |> Enum.chunk_every(3)
-      |> Enum.map(fn x -> pixel_value(Enum.at(x, 0), Enum.at(x, 1), Enum.at(x, 2)) end)
-      |> data_number()
+    # Process image Data with Data Parallelism
+    asciiArt = get_data_number(image, newWidth)
+
+    # print image in original ascii art
+    IO.puts("\nOriginal ASCII ART: \n")
+    print_image(asciiArt, newWidth)
 
     # get image in ascii art
-    time_started = System.monotonic_time(:millisecond)
-    asciiArt = dataNumber |> validate_odd |> ascii_art(False)
-    time_elapsed = System.monotonic_time(:millisecond) - time_started
-    IO.puts("Time elapsed: #{time_elapsed} ms")
+    asciiArtPrime = get_ascii_art(asciiArt)
 
-    # print image in ascii art
-    print_stadistics(asciiArt)
-    print_image(dataNumber, newWidth)
-    print_image(asciiArt, newWidth)
+    # print image in prime number ascii art
+    IO.puts("\nPrime Number ASCII ART: \n")
+    print_image(asciiArtPrime, newWidth)
+
     {:ok, "ASCII art generated"}
   end
 
-  defp print_stadistics(dataNumber) do
-    IO.puts("-----Data number: #{dataNumber}")
-    isPrime = Prime.is_prime(dataNumber)
-    IO.puts("-----Is prime dataNumber: #{isPrime}")
-    sumDigits = sum_digits(dataNumber)
-    IO.puts("-----Digits sum: #{sumDigits}")
-    isPrimeDigits = Prime.is_prime(sumDigits)
-    IO.puts("-----Is prime sumDigits: #{isPrimeDigits}")
+  def get_data_number(image, newWidth) do
+    # get image in ascii art with the elapsed time
+    started_time = System.monotonic_time(:microsecond)
+    dataNumber = image 
+      |> :wxImage.getData() 
+      |> :binary.bin_to_list()
+      |> Enum.chunk_every(3) # Divide into chanels
+      |> Enum.chunk_every(newWidth) # Divide into rows
+      |> Enum.map(fn row -> Task.async(fn -> process_row(row) end) end)
+      |> List.foldl("", fn elem, acc -> acc <> Task.await(elem) end)
+    elapsed_time = (System.monotonic_time(:microsecond) - started_time) / 1000000
+    IO.puts("\nTime getting dataNumber: #{elapsed_time} s")
+    dataNumber
+  end
+
+  defp process_row(row) do  
+    row |> List.foldl("", fn elem, acc -> 
+      pixel = pixel_value(Enum.at(elem, 0), Enum.at(elem, 1), Enum.at(elem, 2)) 
+      acc <> pixel
+    end)
   end
 
   defp validate_odd(number) do
     unless rem(number, 2) == 0, do: number, else: number + 1
   end
 
+  defp get_ascii_art(asciiArt) do
+    started_time = System.monotonic_time(:millisecond)
+    asciiArtPrime = asciiArt 
+      |> String.to_integer()
+      |> validate_odd 
+      |> ascii_art(False)
+      |> Integer.to_string()
+    elapsed_time = (System.monotonic_time(:millisecond) - started_time) / 1000
+    IO.puts("\nTime getting ASCII ART in Prime number: #{elapsed_time} s")
+    asciiArtPrime
+  end
+
   defp ascii_art(dataNumber, True), do: dataNumber - 2 
-  defp ascii_art(dataNumber, _isPrime) do
-    # validate sum digits is prime
-    isPrime = dataNumber
-      |> sum_digits()
+  defp ascii_art(dataNumber, False) do
+    isPrime = dataNumber 
+      |> sum_digits() 
       |> Prime.is_prime()
-    # validate dataNumber is prime
     isPrime = if isPrime == True, do: Prime.is_prime(dataNumber), else: False
     ascii_art(dataNumber + 2, isPrime)
   end
 
   defp pixel_value(r, g, b) do
-    # get pixel in grayscale
-    gray_scale = (r * 0.299 + g * 0.587 + b * 0.114) |> trunc()
-
-    # get divider range for ascii art characters 
-    divider = 255 / length(@values)
-
-    # get ascii art character index
-    index = gray_scale / divider |> trunc()
-
+    index = (r * 0.299 + g * 0.587 + b * 0.114) / @divider |> trunc()
     Enum.at(@values, index)
   end
 
@@ -83,19 +95,12 @@ defmodule Service do
       |> Enum.reduce(fn x, acc ->  x + acc end)
   end
 
-  defp data_number(dataList) do
-    dataList 
-      |> List.to_string() 
-      |> String.to_integer()
-  end
-
-  defp print_image(dataNumber, width) do
-    dataNumber 
-      |> Integer.to_string()
-      |> String.split("", trim: true)
-      |> Enum.chunk_every(width)
-      |> Enum.map(fn x -> x |> List.to_string() end)
-      |> Enum.map(fn x -> x |> IO.inspect() end)
+  defp print_image(asciiArt, width) do
+    asciiArt 
+      |> Stream.unfold(&String.split_at(&1, width)) 
+      |> Enum.take_while(&(&1 != "")) 
+      |> Enum.join("\n")
+      |> IO.puts()
   end
 
 end
