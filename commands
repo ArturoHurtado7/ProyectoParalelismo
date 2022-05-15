@@ -1,0 +1,14 @@
+mix new parallelism --module Service
+mix new parallelism --module Prime
+mix help
+mix deps.get
+mix compile
+iex -S mix
+iex.bat -S mix
+
+recompile()
+
+Service.start("C:/Users/ArturoHurtado/Downloads/elisa.jpg")
+Service.start("C:/Users/ArturoHurtado/Downloads/elisa.jpg", 20)
+
+:observer.start
