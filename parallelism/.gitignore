@@ -24,3 +24,6 @@ parallelism-*.tar
 
 # Temporary files, for example, from tests.
 /tmp/
+
+# Ignore result files
+/result/*.txt

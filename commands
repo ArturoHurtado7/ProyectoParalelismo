@@ -10,6 +10,7 @@ recompile()
 
 Service.start("C:/Users/ArturoHurtado/Downloads/elisa.jpg")
 Service.start("C:/Users/ArturoHurtado/Downloads/elisa.jpg", 20)
+Service.start("C:/Users/ArturoHurtado/Downloads/elisa.jpg", 30)
 Service.start("C:/Users/ArturoHurtado/Downloads/elisa.jpg", 100)
 
 :observer.start
